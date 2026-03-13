@@ -242,7 +242,27 @@ function ConfirmScreen({ booking, onHome }) {
   );
 }
 
-function AdminScreen({ onBack }) {
+function CancelledScreen({ booking, onHome }) {
+  return (
+    <div className="screen confirm-screen cancelled-screen">
+      <div className="confirm-anim"><div className="cancelled-circle">✕</div></div>
+      <h2 className="confirm-title cancelled-title">Booking Cancelled</h2>
+      <p className="confirm-sub">We're sorry your booking has been cancelled. Please contact us to reschedule.</p>
+      <div className="confirm-ref">Ref: <strong>{booking.ref}</strong></div>
+      <div className="confirm-summary cancelled-summary">
+        <div className="cs-row"><span>📋</span> {booking.service?.title}</div>
+        <div className="cs-row"><span>📅</span> {booking.date} at {booking.time}</div>
+        <div className="cs-row"><span>📍</span> {booking.address}</div>
+        <div className="cs-row"><span>📞</span> {booking.phone}</div>
+        <div className="cs-row"><span>📧</span> {booking.email}</div>
+      </div>
+      <div className="status-badge cancelled">❌ Booking Cancelled</div>
+      <button className="btn-primary btn-rebook" onClick={onHome}>Book Again</button>
+    </div>
+  );
+}
+
+function AdminScreen({ onBack, onCancelled }) {
   const [bookings, setBookings] = useState([]);
   const [respondingId, setRespondingId] = useState(null);
   const [msg, setMsg] = useState("");
@@ -300,6 +320,7 @@ function AdminScreen({ onBack }) {
           response,
         }, EMAILJS_PUBLIC_KEY);
         alert("❌ Booking cancelled & patient notified!");
+        onCancelled(b);
       } catch (err) {
         alert("Error cancelling. Please try again.");
         console.error(err);
@@ -383,6 +404,12 @@ export default function App() {
   const [screen, setScreen] = useState(isAdmin ? "admin" : "home");
   const [selectedService, setSelectedService] = useState(null);
   const [currentBooking, setCurrentBooking] = useState(null);
+  const [cancelledBooking, setCancelledBooking] = useState(null);
+
+  const handleCancelled = (booking) => {
+    setCancelledBooking(booking);
+    setScreen("cancelled");
+  };
 
   return (
     <>
@@ -444,19 +471,25 @@ export default function App() {
         .btn-primary:hover { background: #0c4a94; }
         .btn-primary:disabled { background: #7a90aa; cursor: not-allowed; }
         .btn-confirm { background: linear-gradient(135deg, #0a3d7a, #0c5aad); }
+        .btn-rebook { background: linear-gradient(135deg, #cc0000, #ff4444) !important; margin-top: 0; }
         .confirm-screen { align-items: center; justify-content: center; padding: 30px 24px; text-align: center; }
+        .cancelled-screen { background: #fff8f8; }
         .confirm-anim { margin-bottom: 20px; }
         .confirm-circle { width: 80px; height: 80px; background: linear-gradient(135deg, #0a3d7a, #1d7ddc); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 32px; animation: pop 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
+        .cancelled-circle { width: 80px; height: 80px; background: linear-gradient(135deg, #cc0000, #ff4444); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 36px; font-weight: 700; animation: pop 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
         @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .confirm-title { font-family: 'DM Serif Display', serif; font-size: 30px; color: #0d1f3a; margin-bottom: 10px; }
+        .cancelled-title { color: #cc0000 !important; }
         .confirm-sub { font-size: 14px; color: #7a90aa; line-height: 1.6; max-width: 280px; margin-bottom: 16px; }
         .confirm-ref { font-size: 12px; color: #7a90aa; margin-bottom: 20px; }
         .confirm-ref strong { color: #0a3d7a; }
         .confirm-summary { background: #f5f9ff; border: 1.5px solid #dce8f5; border-radius: 16px; padding: 16px; width: 100%; margin-bottom: 16px; }
+        .cancelled-summary { background: #fff0f0 !important; border-color: #ffcccc !important; }
         .cs-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #0d1f3a; padding: 6px 0; border-bottom: 1px solid #edf2f8; text-align: left; }
         .cs-row:last-child { border-bottom: none; }
         .status-badge { font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 20px; margin-bottom: 20px; }
         .status-badge.pending { background: #fff7e0; color: #a06000; border: 1px solid #f5d67a; }
+        .status-badge.cancelled { background: #fff0f0; color: #cc0000; border: 1px solid #ffcccc; }
         .admin-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; background: #0a3d7a; position: sticky; top: 0; z-index: 10; }
         .admin-title { color: #fff; font-size: 16px; font-weight: 600; flex: 1; }
         .admin-badge { background: #e03e3e; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
@@ -492,7 +525,8 @@ export default function App() {
       {screen === "home" && <HomeScreen onBook={(s) => { setSelectedService(s); setScreen("booking"); }} />}
       {screen === "booking" && <BookingScreen service={selectedService} onBack={() => setScreen("home")} onConfirm={(b) => { setCurrentBooking(b); setScreen("confirm"); }} />}
       {screen === "confirm" && <ConfirmScreen booking={currentBooking} onHome={() => setScreen("home")} />}
-      {screen === "admin" && <AdminScreen onBack={() => setScreen("home")} />}
+      {screen === "cancelled" && <CancelledScreen booking={cancelledBooking} onHome={() => setScreen("home")} />}
+      {screen === "admin" && <AdminScreen onBack={() => setScreen("admin")} onCancelled={handleCancelled} />}
     </>
   );
 }
