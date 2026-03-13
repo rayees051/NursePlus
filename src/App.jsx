@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import emailjs from "@emailjs/browser";
 
 const firebaseApp = initializeApp({
   apiKey: "AIzaSyCx1WIj6sz1ZQ7e_ghNTc3x6UwaT1ET8MA",
@@ -10,9 +11,7 @@ const firebaseApp = initializeApp({
   messagingSenderId: "931847006251",
   appId: "1:931847006251:web:2eba6307cb363aa19be26e"
 });
-
 const db = getFirestore(firebaseApp);
-import emailjs from "@emailjs/browser";
 
 const EMAILJS_SERVICE_ID = "service_exfyxpi";
 const EMAILJS_ADMIN_TEMPLATE = "template_0yxr5ed";
@@ -110,31 +109,21 @@ function BookingScreen({ service, onBack, onConfirm }) {
       const booking = {
         ...form,
         service: { id: service.id, title: service.title, price: service.price },
-        ref,
-        status: "pending",
-        response: "",
+        ref, status: "pending", response: "",
         createdAt: serverTimestamp(),
       };
       const docRef = await addDoc(collection(db, "bookings"), booking);
-
-      // Send email to ADMIN
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_ADMIN_TEMPLATE,
-        {
-          ref,
-          patient_name: form.name,
-          phone: form.phone,
-          patient_email: form.email,
-          service_title: service.title,
-          date: form.date,
-          time: form.time,
-          address: form.address,
-          notes: form.notes || "None",
-        },
-        EMAILJS_PUBLIC_KEY
-      );
-
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_ADMIN_TEMPLATE, {
+        ref,
+        patient_name: form.name,
+        phone: form.phone,
+        patient_email: form.email,
+        service_title: service.title,
+        date: form.date,
+        time: form.time,
+        address: form.address,
+        notes: form.notes || "None",
+      }, EMAILJS_PUBLIC_KEY);
       onConfirm({ ...booking, docId: docRef.id, createdAt: new Date().toLocaleString() });
     } catch (err) {
       alert("Something went wrong. Please try again.");
@@ -148,9 +137,7 @@ function BookingScreen({ service, onBack, onConfirm }) {
       <div className="booking-top">
         <button className="back-btn" onClick={onBack}>← Back</button>
         <div className="progress-row">
-          {[1,2,3].map(n => (
-            <div key={n} className={`progress-dot ${step >= n ? "active" : ""}`} />
-          ))}
+          {[1,2,3].map(n => <div key={n} className={`progress-dot ${step >= n ? "active" : ""}`} />)}
         </div>
       </div>
       <div className="booking-service-chip"><span>{service.icon}</span> {service.title}</div>
@@ -235,7 +222,7 @@ function BookingScreen({ service, onBack, onConfirm }) {
   );
 }
 
-function ConfirmScreen({ booking, onHome, onAdmin }) {
+function ConfirmScreen({ booking, onHome }) {
   return (
     <div className="screen confirm-screen">
       <div className="confirm-anim"><div className="confirm-circle">✓</div></div>
@@ -249,9 +236,8 @@ function ConfirmScreen({ booking, onHome, onAdmin }) {
         <div className="cs-row"><span>📞</span> {booking.phone}</div>
         <div className="cs-row"><span>📧</span> {booking.email}</div>
       </div>
-      <div className="status-badge pending">Status: Awaiting Confirmation</div>
-      <button className="btn-primary" onClick={onHome} style={{marginBottom:12}}>Book Another</button>
-    
+      <div className="status-badge pending">⏳ Awaiting Confirmation</div>
+      <button className="btn-primary" onClick={onHome}>Book Another</button>
     </div>
   );
 }
@@ -273,30 +259,21 @@ function AdminScreen({ onBack }) {
     return () => unsub();
   }, []);
 
-  const send = async (b) => {
+  const confirmBooking = async (b) => {
     setSending(true);
     const response = msg || "Your booking is confirmed! Our nurse will arrive at the scheduled time.";
     try {
-      // Update Firebase
       await updateDoc(doc(db, "bookings", b.docId), { status: "confirmed", response });
-
-      // Send confirmation email to USER
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_USER_TEMPLATE,
-        {
-          patient_name: b.name,
-          patient_email: b.email,
-          ref: b.ref,
-          service_title: b.service?.title,
-          date: b.date,
-          time: b.time,
-          address: b.address,
-          response,
-        },
-        EMAILJS_PUBLIC_KEY
-      );
-
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_USER_TEMPLATE, {
+        patient_name: b.name,
+        patient_email: b.email,
+        ref: b.ref,
+        service_title: b.service?.title,
+        date: b.date,
+        time: b.time,
+        address: b.address,
+        response,
+      }, EMAILJS_PUBLIC_KEY);
       alert("✅ Booking confirmed & email sent to patient!");
     } catch (err) {
       alert("Error sending email. Please try again.");
@@ -307,12 +284,41 @@ function AdminScreen({ onBack }) {
     setSending(false);
   };
 
+  const cancelBooking = async (b) => {
+    if (window.confirm("Are you sure you want to cancel this booking?")) {
+      try {
+        const response = "We're sorry, your booking has been cancelled. Please contact us to reschedule.";
+        await updateDoc(doc(db, "bookings", b.docId), { status: "cancelled", response });
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_USER_TEMPLATE, {
+          patient_name: b.name,
+          patient_email: b.email,
+          ref: b.ref,
+          service_title: b.service?.title,
+          date: b.date,
+          time: b.time,
+          address: b.address,
+          response,
+        }, EMAILJS_PUBLIC_KEY);
+        alert("❌ Booking cancelled & patient notified!");
+      } catch (err) {
+        alert("Error cancelling. Please try again.");
+        console.error(err);
+      }
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    if (status === "pending") return "⏳ Pending";
+    if (status === "confirmed") return "✅ Confirmed";
+    if (status === "cancelled") return "❌ Cancelled";
+  };
+
   return (
     <div className="screen admin-screen">
       <div className="admin-header">
         <button className="back-btn" onClick={onBack}>← App</button>
         <span className="admin-title">Admin Panel</span>
-        <span className="admin-badge">{bookings.filter(b=>b.status==="pending").length} pending</span>
+        <span className="admin-badge">{bookings.filter(b => b.status === "pending").length} pending</span>
       </div>
       {loading && <div className="empty-state">Loading bookings...</div>}
       {!loading && bookings.length === 0 && <div className="empty-state">No bookings yet.<br/>They'll appear here instantly.</div>}
@@ -321,7 +327,7 @@ function AdminScreen({ onBack }) {
           <div className="bc-top">
             <div>
               <span className="bc-ref">{b.ref}</span>
-              <span className={`bc-status ${b.status}`}>{b.status === "pending" ? "⏳ Pending" : "✅ Confirmed"}</span>
+              <span className={`bc-status ${b.status}`}>{getStatusLabel(b.status)}</span>
             </div>
           </div>
           <div className="bc-name">{b.name}</div>
@@ -335,26 +341,39 @@ function AdminScreen({ onBack }) {
           </div>
           <div className="bc-meta"><span>📍 {b.address}</span></div>
           {b.notes && <div className="bc-notes">Note: {b.notes}</div>}
+
           {b.status === "pending" && (
             respondingId === b.docId ? (
               <div className="respond-box">
-                <textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="Type your message to the patient... (or leave blank for default)" rows={3} />
+                <textarea
+                  value={msg}
+                  onChange={e => setMsg(e.target.value)}
+                  placeholder="Type your message to the patient... (or leave blank for default)"
+                  rows={3}
+                />
                 <div className="respond-actions">
-                  <button className="btn-send" onClick={() => send(b)} disabled={sending}>
-                    {sending ? "Sending..." : "Confirm & Email Patient ✓"}
+                  <button className="btn-send" onClick={() => confirmBooking(b)} disabled={sending}>
+                    {sending ? "Sending..." : "Confirm & Email ✓"}
                   </button>
-                  <button className="btn-cancel-sm" onClick={() => setRespondingId(null)}>Cancel</button>
+                  <button className="btn-cancel-sm" onClick={() => setRespondingId(null)}>Back</button>
                 </div>
               </div>
             ) : (
-              <button className="btn-respond" onClick={() => setRespondingId(b.docId)}>Respond to Patient →</button>
+              <div className="action-row">
+                <button className="btn-respond" onClick={() => setRespondingId(b.docId)}>Confirm →</button>
+                <button className="btn-cancel-booking" onClick={() => cancelBooking(b)}>Cancel ✕</button>
+              </div>
             )
           )}
-          {b.status === "confirmed" && b.response && (
-            <div className="response-sent"><span>💬 Sent:</span> {b.response}</div>
+
+          {(b.status === "confirmed" || b.status === "cancelled") && b.response && (
+            <div className={`response-sent ${b.status}`}>
+              <span>{b.status === "confirmed" ? "💬" : "❌"}</span> {b.response}
+            </div>
           )}
         </div>
       ))}
+      <div style={{height:"20px"}} />
     </div>
   );
 }
@@ -425,7 +444,6 @@ export default function App() {
         .btn-primary:hover { background: #0c4a94; }
         .btn-primary:disabled { background: #7a90aa; cursor: not-allowed; }
         .btn-confirm { background: linear-gradient(135deg, #0a3d7a, #0c5aad); }
-        .btn-secondary { width: 100%; background: #edf4ff; color: #0a3d7a; border: none; border-radius: 14px; padding: 14px; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; }
         .confirm-screen { align-items: center; justify-content: center; padding: 30px 24px; text-align: center; }
         .confirm-anim { margin-bottom: 20px; }
         .confirm-circle { width: 80px; height: 80px; background: linear-gradient(135deg, #0a3d7a, #1d7ddc); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 32px; animation: pop 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
@@ -439,34 +457,41 @@ export default function App() {
         .cs-row:last-child { border-bottom: none; }
         .status-badge { font-size: 12px; font-weight: 600; padding: 7px 16px; border-radius: 20px; margin-bottom: 20px; }
         .status-badge.pending { background: #fff7e0; color: #a06000; border: 1px solid #f5d67a; }
-        .admin-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; background: #0a3d7a; }
+        .admin-header { padding: 16px 20px; display: flex; align-items: center; gap: 12px; background: #0a3d7a; position: sticky; top: 0; z-index: 10; }
         .admin-title { color: #fff; font-size: 16px; font-weight: 600; flex: 1; }
         .admin-badge { background: #e03e3e; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
         .admin-header .back-btn { color: #7ab3e8; }
         .booking-card { margin: 12px 14px 0; background: #fff; border: 1.5px solid #dce8f5; border-radius: 16px; padding: 16px; }
         .booking-card.confirmed { border-color: #b2e8d6; background: #f9fffe; }
+        .booking-card.cancelled { border-color: #ffcccc; background: #fff8f8; opacity: 0.8; }
         .bc-top { display: flex; justify-content: space-between; margin-bottom: 8px; }
         .bc-ref { font-size: 11px; font-weight: 700; color: #0a3d7a; letter-spacing: 1px; margin-right: 8px; }
         .bc-status { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
         .bc-status.pending { background: #fff7e0; color: #a06000; }
         .bc-status.confirmed { background: #e6faf4; color: #0a6e55; }
+        .bc-status.cancelled { background: #fff0f0; color: #cc0000; }
         .bc-name { font-size: 16px; font-weight: 600; color: #0d1f3a; margin-bottom: 8px; }
         .bc-meta { display: flex; gap: 12px; font-size: 12px; color: #7a90aa; margin-bottom: 4px; flex-wrap: wrap; }
         .bc-notes { font-size: 12px; color: #7a90aa; background: #f5f9ff; border-radius: 8px; padding: 8px; margin-top: 8px; }
-        .btn-respond { margin-top: 12px; width: 100%; background: #edf4ff; border: 1.5px solid #c5d9f5; color: #0a3d7a; border-radius: 10px; padding: 10px; font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .action-row { display: flex; gap: 8px; margin-top: 12px; }
+        .btn-respond { flex: 1; background: #edf4ff; border: 1.5px solid #c5d9f5; color: #0a3d7a; border-radius: 10px; padding: 10px; font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn-cancel-booking { background: #fff0f0; border: 1.5px solid #ffcccc; color: #cc0000; border-radius: 10px; padding: 10px 14px; font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
         .respond-box { margin-top: 12px; }
         .respond-box textarea { width: 100%; border: 1.5px solid #dce8f5; border-radius: 10px; padding: 10px; font-family: 'Sora', sans-serif; font-size: 13px; color: #0d1f3a; background: #fafcff; outline: none; resize: none; }
         .respond-actions { display: flex; gap: 8px; margin-top: 8px; }
         .btn-send { flex: 1; background: #0a3d7a; color: #fff; border: none; border-radius: 10px; padding: 10px; font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
         .btn-send:disabled { background: #7a90aa; cursor: not-allowed; }
         .btn-cancel-sm { background: #f0f2f5; color: #7a90aa; border: none; border-radius: 10px; padding: 10px 14px; font-family: 'Sora', sans-serif; font-size: 13px; cursor: pointer; }
-        .response-sent { margin-top: 10px; font-size: 12px; color: #0a6e55; background: #e6faf4; border-radius: 8px; padding: 8px 10px; }
+        .response-sent { margin-top: 10px; font-size: 12px; border-radius: 8px; padding: 8px 10px; }
+        .response-sent.confirmed { color: #0a6e55; background: #e6faf4; }
+        .response-sent.cancelled { color: #cc0000; background: #fff0f0; }
         .empty-state { text-align: center; color: #aabbcc; font-size: 14px; padding: 60px 20px; line-height: 1.8; }
         @media (max-width: 440px) { .screen { max-width: 100%; } }
       `}</style>
+
       {screen === "home" && <HomeScreen onBook={(s) => { setSelectedService(s); setScreen("booking"); }} />}
       {screen === "booking" && <BookingScreen service={selectedService} onBack={() => setScreen("home")} onConfirm={(b) => { setCurrentBooking(b); setScreen("confirm"); }} />}
-      {screen === "confirm" && <ConfirmScreen booking={currentBooking} onHome={() => setScreen("home")} onAdmin={() => setScreen("admin")} />}
+      {screen === "confirm" && <ConfirmScreen booking={currentBooking} onHome={() => setScreen("home")} />}
       {screen === "admin" && <AdminScreen onBack={() => setScreen("home")} />}
     </>
   );
