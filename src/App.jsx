@@ -1,6 +1,17 @@
 import { useState, useEffect } from "react";
-import { db } from "./firebase";
-import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+
+const firebaseApp = initializeApp({
+  apiKey: "AIzaSyCx1WIj6sz1ZQ7e_ghNTc3x6UwaT1ET8MA",
+  authDomain: "nurseplus-313.firebaseapp.com",
+  projectId: "nurseplus-313",
+  storageBucket: "nurseplus-313.firebasestorage.app",
+  messagingSenderId: "931847006251",
+  appId: "1:931847006251:web:2eba6307cb363aa19be26e"
+});
+
+const db = getFirestore(firebaseApp);
 import emailjs from "@emailjs/browser";
 
 const EMAILJS_SERVICE_ID = "service_exfyxpi";
