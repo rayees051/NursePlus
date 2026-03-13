@@ -293,6 +293,12 @@ function AdminScreen({ onBack, onCancelled }) {
         time: b.time,
         address: b.address,
         response,
+        header_color: "#0a3d7a",
+        header_icon: "✓",
+        header_title: "Booking Confirmed!",
+        header_message: "Great news! Your booking has been confirmed ✅",
+        body_bg: "#f5f9ff",
+        body_border: "#dce8f5",
       }, EMAILJS_PUBLIC_KEY);
       alert("✅ Booking confirmed & email sent to patient!");
     } catch (err) {
@@ -318,6 +324,12 @@ function AdminScreen({ onBack, onCancelled }) {
           time: b.time,
           address: b.address,
           response,
+          header_color: "#cc0000",
+          header_icon: "✕",
+          header_title: "Booking Cancelled",
+          header_message: "We're sorry, your booking has been cancelled ❌",
+          body_bg: "#fff8f8",
+          body_border: "#ffcccc",
         }, EMAILJS_PUBLIC_KEY);
         alert("❌ Booking cancelled & patient notified!");
         onCancelled(b);
@@ -362,16 +374,10 @@ function AdminScreen({ onBack, onCancelled }) {
           </div>
           <div className="bc-meta"><span>📍 {b.address}</span></div>
           {b.notes && <div className="bc-notes">Note: {b.notes}</div>}
-
           {b.status === "pending" && (
             respondingId === b.docId ? (
               <div className="respond-box">
-                <textarea
-                  value={msg}
-                  onChange={e => setMsg(e.target.value)}
-                  placeholder="Type your message to the patient... (or leave blank for default)"
-                  rows={3}
-                />
+                <textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="Type your message to the patient... (or leave blank for default)" rows={3} />
                 <div className="respond-actions">
                   <button className="btn-send" onClick={() => confirmBooking(b)} disabled={sending}>
                     {sending ? "Sending..." : "Confirm & Email ✓"}
@@ -386,7 +392,6 @@ function AdminScreen({ onBack, onCancelled }) {
               </div>
             )
           )}
-
           {(b.status === "confirmed" || b.status === "cancelled") && b.response && (
             <div className={`response-sent ${b.status}`}>
               <span>{b.status === "confirmed" ? "💬" : "❌"}</span> {b.response}
@@ -471,7 +476,7 @@ export default function App() {
         .btn-primary:hover { background: #0c4a94; }
         .btn-primary:disabled { background: #7a90aa; cursor: not-allowed; }
         .btn-confirm { background: linear-gradient(135deg, #0a3d7a, #0c5aad); }
-        .btn-rebook { background: linear-gradient(135deg, #cc0000, #ff4444) !important; margin-top: 0; }
+        .btn-rebook { background: linear-gradient(135deg, #cc0000, #ff4444) !important; }
         .confirm-screen { align-items: center; justify-content: center; padding: 30px 24px; text-align: center; }
         .cancelled-screen { background: #fff8f8; }
         .confirm-anim { margin-bottom: 20px; }
